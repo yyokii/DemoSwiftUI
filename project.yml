@@ -1,0 +1,109 @@
+name: DemoSwiftUI
+
+options:
+  # プリフィクスを指定すると、各ターゲットのバンドルIDが自動で「{プリフィクス}.{ターゲット名}」に設定される
+  bundleIdPrefix: com.yyokii
+  deploymentTarget:
+    iOS: 13.0
+  xcodeVersion: "11.6"
+  # findCarthageFrameworks: true # 余計なフレームワークまで追加されてしまうためコメントアウト
+  carthageExecutablePath: mint run Carthage/Carthage carthage
+
+packages:
+  Rswift:
+    url: https://github.com/mac-cain13/R.swift.Library
+    version: 5.2.0
+
+targets:
+  DemoSwiftUI:
+    type: application
+    platform: iOS
+    sources:
+      - DemoSwiftUI
+      - path: "DemoSwiftUI/Generated/R.generated.swift"
+        optional: true
+        type: file
+    settings:
+      base:
+        INFOPLIST_FILE: DemoSwiftUI/Info.plist
+        # PRODUCT_BUNDLE_IDENTIFIER: {Bundle ID Prefix}.{Project Name} # `bundleIdPrefix` を指定しない場合はコメントイン
+        CODE_SIGN_ENTITLEMENTS: DemoSwiftUI/DemoSwiftUI.entitlements
+    dependencies:
+      # - carthage: Alamofire # 適宜必要なライブラリを追加
+      - package: Rswift
+    preBuildScripts:
+      - script: |
+                if mint list | grep -q 'R.swift'; then
+                  mint run R.swift rswift generate "$SRCROOT/$TARGET_NAME/Generated/R.generated.swift"
+                else
+                  echo "error: R.swift not installed; run 'mint bootstrap' to install"
+                  return -1
+                fi
+        name: Generate Resources with R.swift
+        inputFiles:
+          - $TEMP_DIR/rswift-lastrun
+        outputFiles:
+          - $SRCROOT/$TARGET_NAME/Generated/R.generated.swift
+      - script: |
+                mint run swiftformat
+        name: Run Swiftformat
+    postCompileScripts:
+      - script: |
+                if which mint >/dev/null; then
+                  mint run swiftlint swiftlint autocorrect --format
+                  mint run swiftlint swiftlint
+                else
+                  echo "warning: Mint not installed, download from https://github.com/yonaskolb/Mint"
+                fi
+        name: Run SwiftLint
+  DemoSwiftUITests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - DemoSwiftUITests
+    settings:
+      base:
+        INFOPLIST_FILE: DemoSwiftUITests/Info.plist
+        # PRODUCT_BUNDLE_IDENTIFIER: {Bundle ID Prefix}.{Project Name}Tests
+    dependencies:
+      - target: DemoSwiftUI
+
+  DemoSwiftUIUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - DemoSwiftUIUITests
+    settings:
+      base:
+        INFOPLIST_FILE: DemoSwiftUIUITests/Info.plist
+        # PRODUCT_BUNDLE_IDENTIFIER: {Bundle ID Prefix}.{Project Name}UITests
+    dependencies:
+      - target: DemoSwiftUI
+
+schemes:
+  DemoSwiftUI:
+    build:
+      targets:
+        DemoSwiftUI: all
+        # {Project Name}Tests: [test] # デフォルト？
+        # {Project Name}UITests: [test] # デフォルト？
+    run:
+      config: Debug
+    test:
+      config: Debug
+      gatherCoverageData: true
+      coverageTargets:
+        - DemoSwiftUI
+      targets:
+        - name: DemoSwiftUITests
+          parallelizable: true
+          randomExecutionOrder: true
+        - name: DemoSwiftUIUITests
+          parallelizable: true
+          randomExecutionOrder: true
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release
